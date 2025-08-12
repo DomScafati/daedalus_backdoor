@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scylla Dynamics // backdoor</title>
+  <style>
+    :root { --bg:#0b0f10; --fg:#cde8cf; --accent:#6df06d; }
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.5}
+    .wrapper{max-width:920px;margin:0 auto;padding:24px}
+    .header{color:var(--accent);opacity:.9;margin-bottom:8px}
+    .terminal{background:#0a0e0a;border:1px solid #173217;box-shadow:0 10px 30px rgba(0,0,0,.5) inset,0 0 40px rgba(0,255,80,.08);border-radius:12px;padding:16px;min-height:70vh;position:relative;overflow:auto}
+    .terminal::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(transparent 0 2px,rgba(0,255,0,.03) 2px 3px);pointer-events:none}
+    .output{white-space:pre-wrap}
+    .promptline{display:flex;gap:8px;align-items:center;margin-top:4px}
+    .prompt{color:#7ff07f}
+    .input{flex:1;outline:none;border:none;background:transparent;color:var(--fg);font:inherit;caret-color:var(--accent)}
+    .cursor{display:inline-block;width:8px;height:1.2em;background:var(--accent);margin-left:2px;animation:blink 1s steps(1) infinite}
+    @keyframes blink{50%{opacity:0}}
+    a{color:var(--accent)}
+    .footer{opacity:.6;margin-top:12px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">~ scylla-dynamics :: secure shell v0.1</div>
+    <div class="terminal" id="term" role="region" aria-label="terminal">
+      <div id="live" class="sr-only" aria-live="polite"></div>
+      <div class="output" id="output"></div>
+      <div class="promptline">
+        <span class="prompt" id="ps1">guest@sd:/home$</span>
+        <input id="cmd" class="input" autocomplete="off" spellcheck="false" autofocus aria-label="Command input" />
+        <span aria-hidden="true" class="cursor"></span>
+      </div>
+    </div>
+    <div class="footer">Type <strong>help</strong> to begin. ↑/↓ for history. <kbd>clear</kbd> to wipe.</div>
+  </div>
+
+  <script>
+  (() => {
+    const output = document.getElementById('output');
+    const input = document.getElementById('cmd');
+    const ps1 = document.getElementById('ps1');
+    const live = document.getElementById('live');
+    const term = document.getElementById('term');
+
+    const state = {
+      history: JSON.parse(localStorage.getItem('history')||'[]'),
+      idx: null,
+      user: 'guest',
+      path: '/home',
+    };
+
+    function print(html='') {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      output.appendChild(div);
+      live.textContent = div.textContent || '';
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function println(text='') {
+      print(escapeHtml(text));
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/\"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+    }
+
+    function banner() {
+      print('<span style="color:#6df06d">Access granted.</span> Welcome, ' + state.user + '.');
+      println('Type "help" for available commands.');
+      println('');
+    }
+
+    const commands = {
+      help() {
+        print([
+          'Available commands:',
+          '  help             Show this message',
+          '  about            Who am I?',
+          '  projects         Show recent work',
+          '  contact          How to reach me',
+          '  ls               List files',
+          '  open <file>      Open a file/link',
+          '  clear            Clear the screen',
+          '  theme [light|dark|matrix]  Switch theme',
+        ].join('\n'));
+      },
+      about() {
+        print([
+          "Hi, I'm Dom — iOS developer & creative tinkerer.",
+          'I build Swift/SwiftUI apps and worldbuild sci‑fantasy settings.',
+          'This "backdoor" is my playful portfolio shell.',
+        ].join('\n'));
+      },
+      projects() {
+        print([
+          'projects/',
+          '  moodnote          -> journal app (SwiftUI + Firebase) :: open projects/moodnote',
+          '  escential         -> fragrance tracker (SwiftData)     :: open projects/escential',
+          '  black-library     -> sci‑fantasy D&D toolkit           :: open projects/black-library',
+        ].join('\n'));
+      },
+      contact() {
+        print([
+          'contact/',
+          '  email             -> open contact/email',
+          '  linkedin          -> open contact/linkedin',
+          '  github            -> open contact/github',
+        ].join('\n'));
+      },
+      ls() {
+        print(['about.txt','projects','contact','README'].join('\n'));
+      },
+      open(arg) {
+        const routes = {
+          'projects/moodnote': 'https://github.com/youruser/MoodNote',
+          'projects/escential': 'https://github.com/youruser/Escential',
+          'projects/black-library': '#',
+          'contact/email': 'mailto:you@example.com',
+          'contact/linkedin': 'https://www.linkedin.com/in/yourprofile',
+          'contact/github': 'https://github.com/youruser',
+          'README': 'https://yourdomain'
+        };
+        const url = routes[arg];
+        if (!url) return println('open: unknown target: ' + arg);
+        window.open(url, '_blank');
+        println('opening ' + arg + ' …');
+      },
+      clear() { output.innerHTML=''; },
+      theme(arg) {
+        switch (arg) {
+          case 'light':
+            document.documentElement.style.setProperty('--bg', '#f7f7f7');
+            document.documentElement.style.setProperty('--fg', '#1a1a1a');
+            document.documentElement.style.setProperty('--accent', '#007acc');
+            break;
+          case 'matrix':
+            document.documentElement.style.setProperty('--bg', '#000000');
+            document.documentElement.style.setProperty('--fg', '#b3ffb3');
+            document.documentElement.style.setProperty('--accent', '#00ff00');
+            break;
+          default:
+            document.documentElement.style.setProperty('--bg', '#0b0f10');
+            document.documentElement.style.setProperty('--fg', '#cde8cf');
+            document.documentElement.style.setProperty('--accent', '#6df06d');
+        }
+        println('theme set to ' + (arg || 'dark'));
+      },
+    };
+
+    function run(cmdline) {
+      print('<span class="prompt">' + state.user + '@sd:' + state.path + '$</span> ' + escapeHtml(cmdline));
+      if (!cmdline.trim()) return;
+      const [cmd, ...parts] = cmdline.trim().split(/\s+/);
+      const arg = parts.join(' ');
+      if (commands[cmd]) {
+        commands[cmd](arg);
+      } else {
+        println('command not found: ' + cmd);
+      }
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const value = input.value;
+        state.history.push(value);
+        localStorage.setItem('history', JSON.stringify(state.history.slice(-100)));
+        state.idx = null;
+        input.value='';
+        run(value);
+      } else if (e.key === 'ArrowUp') {
+        if (state.idx === null) state.idx = state.history.length;
+        if (state.idx > 0) state.idx--;
+        input.value = state.history[state.idx] || '';
+        setTimeout(()=>input.setSelectionRange(input.value.length, input.value.length),0);
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown') {
+        if (state.idx === null) return;
+        if (state.idx < state.history.length) state.idx++;
+        input.value = state.history[state.idx] || '';
+        e.preventDefault();
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        const partial = input.value.trim();
+        const matches = Object.keys(commands).filter(c => c.startsWith(partial));
+        if (matches.length === 1) input.value = matches[0] + ' ';
+      }
+    });
+
+    banner();
+  })();
+  </script>
+</body>
+</html>
